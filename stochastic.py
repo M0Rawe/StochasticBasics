@@ -7,8 +7,8 @@ import tree_gen
 (nu,nx,N,lf,lr,ts) = (2,4,20,1,1,0.1)       #nu = Number of inputs, nx = number of states
 ltot = lf+lr
 
-(xref, yref, psiref, betaref) = (2,2,0,0)
-(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 100.0, 2,2)
+(xref, yref, psiref, betaref) = (1,1,0,0)
+(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 100, 2,2)
 
 u = cs.SX.sym('u', nu*N)
 z0 = cs.SX.sym('z0', nx)
@@ -92,7 +92,7 @@ mng = og.tcp.OptimizerTcpManager('basic_optimizer/bicycle')
 mng.start()
 
 mng.ping()
-solution = mng.call([1.0, 1.0, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
+solution = mng.call([-0.8, -0.8, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
 mng.kill()
 
 
@@ -122,7 +122,7 @@ plt.show()
 
 # Plot trajectory
 # ------------------------------------
-x_init = [-1.0,2.0,0.0,0.0]
+x_init = [-1.0,-1.0,0.0,0.0]
 x_states = [0.0] * (nx*(N+2))
 x_states[0:nx+1] = x_init
 for t in range(0, N):
@@ -134,10 +134,11 @@ for t in range(0, N):
     beta = x_states[t * nx + 3]
 
     beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
+    psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])*ts
 
-    x_states[(t+1)*nx]  = x + ts*(u_t[0]*cs.cos(psi+beta_dot))
-    x_states[(t+1)*nx+1] = y + ts*(u_t[0]*cs.sin(psi+beta_dot))
-    x_states[(t+1)*nx+2] = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])
+    x_states[(t+1)*nx]  = x + ts*(u_t[0]*cs.cos(psi_dot+beta_dot))
+    x_states[(t+1)*nx+1] = y + ts*(u_t[0]*cs.sin(psi_dot+beta_dot))
+    x_states[(t+1)*nx+2] = psi + ts*psi_dot
     x_states[(t+1)*nx+3] = beta + ts*beta_dot
 
 xx = x_states[0:nx*N:nx]
@@ -148,4 +149,6 @@ print(xx)
 plt.plot(xx, xy, '-o')
 plt.show()
 
-print(solution["exit_status"])
+print(f"Solution exit status "+str(solution["exit_status"]))
+print(f"Solution penalty "+str(solution["penalty"]))
+print(f"Solution time "+str(solution["solve_time_ms"]))

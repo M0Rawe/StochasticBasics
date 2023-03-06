@@ -6,7 +6,7 @@ import numpy as np
 # Build parametric optimizer
 # ------------------------------------
 (nu, nx, N, L, ts) = (2, 3, 20, 0.5, 0.1)
-(xref, yref, thetaref) = (2, 2, 0)
+(xref, yref, thetaref) = (1, 1, 0)
 (q, qtheta, r, qN, qthetaN) = (10, 0.1, 1, 200, 2)
 
 u = cs.SX.sym('u', nu*N)
@@ -78,7 +78,7 @@ x_states = [0.0] * (nx*(N+2))
 x_states[0:nx+1] = x_init
 for t in range(0, N):
     u_t = u_star[t*nu:(t+1)*nu]
-
+    
     x = x_states[t * nx]
     y = x_states[t * nx + 1]
     theta = x_states[t * nx + 2]
@@ -88,7 +88,7 @@ for t in range(0, N):
     x_states[(t+1)*nx] = x + ts * (u_t[0] + L*np.sin(theta)*theta_dot)
     x_states[(t+1)*nx+1] = y + ts * (u_t[1] - L*np.cos(theta)*theta_dot)
     x_states[(t+1)*nx+2] = theta + ts*theta_dot
-
+print("Max = " +str(t * nx + 2))
 xx = x_states[0:nx*N:nx]
 xy = x_states[1:nx*N:nx]
 
