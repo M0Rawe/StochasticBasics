@@ -7,8 +7,8 @@ import tree_gen
 (nu,nx,N,lf,lr,ts) = (2,4,20,1,1,0.1)       #nu = Number of inputs, nx = number of states
 ltot = lf+lr
 
-(xref, yref, psiref, betaref) = (1,1,0,0)
-(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 200.0, 2,2)
+(xref, yref, psiref, betaref) = (2,2,0,0)
+(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 100.0, 2,2)
 
 u = cs.SX.sym('u', nu*N)
 z0 = cs.SX.sym('z0', nx)
@@ -16,12 +16,12 @@ z0 = cs.SX.sym('z0', nx)
 (x,y,psi,beta) = (z0[0], z0[1], z0[2], z0[3])
 
 p = np.array([[0.3,0.15,0.2,0.2,0.15],      #Tranisitional probabilitiy of tree
-                  [0.2,0.3,0.15,0,0.35],
-                  [0.25,0.2,0.3,0.25,0],
-                  [0.3,0,0.25,0.2,0.25],
-                  [0.2,0.25,0,0.3,0.25]])
+              [0.2,0.3,0.15,0,0.35],
+              [0.25,0.2,0.3,0.25,0],
+              [0.3,0,0.25,0.2,0.25],
+              [0.2,0.25,0,0.3,0.25]])
 v_tree = np.array([0.4, 0.15, 0.15,0.15,0.15])       #initial probability of starting node
-(N_tree, tau) = (3, 2)                   #N -> number of stages, tau -> stage at which branching stops
+(N_tree, tau) = (3, 2)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
 tree = tree_gen.MarkovChainScenarioTreeFactory(p, v_tree, N_tree, tau).create()
 
 all_nodes = []
@@ -43,18 +43,26 @@ combined = zip(all_nodes_list,probabilities)
 nodes_flat = [item for sublist in all_nodes_list for item in sublist]
 probabilities_flat = [item for sublist in probabilities for item in sublist]
 
+tree.bulls_eye_plot()
+print(probabilities)
+print(all_nodes)
 cost = 0
+
+
+     
 for i in all_nodes_list[1:(tree.num_stages-1)]:
      for j in i:
-        cost += tree.probability_of_node(j)*(qN*(x-xref)**2+(y-yref)**2+qPsiN*(psi-psiref)**2+qBetaN*(beta-betaref)**2)
+        cost += tree.probability_of_node(j)*(q*(x-xref)**2+(y-yref)**2+qpsi*(psi-psiref)**2+qbeta*(beta-betaref)**2)
         #print(f"At node {j} the probability is {tree.probability_of_node(j)}")
         #print(i,j)
         u_t = u[j:j+2]
+        cost += 1 * cs.dot(u_t, u_t)
         beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
+        psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])*ts
         cost += r*cs.dot(u_t,u_t)
-        x += u_t[0]*cs.cos(psi+beta_dot)*ts
-        y += u_t[0]*cs.sin(psi+beta_dot)*ts
-        psi += (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])*ts
+        x += u_t[0]*cs.cos(psi_dot+beta_dot)*ts
+        y += u_t[0]*cs.sin(psi_dot+beta_dot)*ts
+        psi += ts*psi_dot
         beta += ts*beta_dot
 
 
@@ -76,7 +84,7 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                             build_config,
                                             solver_config)
 
-#builder.build()
+builder.build()
 
 # Use TCP server
 # ------------------------------------
@@ -84,7 +92,7 @@ mng = og.tcp.OptimizerTcpManager('basic_optimizer/bicycle')
 mng.start()
 
 mng.ping()
-solution = mng.call([-1.0, 2.0, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
+solution = mng.call([1.0, 1.0, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
 mng.kill()
 
 
@@ -114,7 +122,7 @@ plt.show()
 
 # Plot trajectory
 # ------------------------------------
-x_init = [-1.0,2.0,0.0]
+x_init = [-1.0,2.0,0.0,0.0]
 x_states = [0.0] * (nx*(N+2))
 x_states[0:nx+1] = x_init
 for t in range(0, N):
@@ -135,7 +143,9 @@ for t in range(0, N):
 xx = x_states[0:nx*N:nx]
 xy = x_states[1:nx*N:nx]
 
-print(x_states)
+# print(x_states)
 print(xx)
 plt.plot(xx, xy, '-o')
 plt.show()
+
+print(solution["exit_status"])
