@@ -21,85 +21,34 @@ p = np.array([[0.3,0.15,0.2,0.2,0.15],      #Tranisitional probabilitiy of tree
               [0.3,0,0.25,0.2,0.25],
               [0.2,0.25,0,0.3,0.25]])
 v_tree = np.array([0.4, 0.15, 0.15,0.15,0.15])       #initial probability of starting node
-(N_tree, tau) = (3, 2)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
+(N_tree, tau) = (10, 3)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
 tree = tree_gen.MarkovChainScenarioTreeFactory(p, v_tree, N_tree, tau).create()
 
 all_nodes = []
 for i in range(tree.num_stages):
     all_nodes.append(tree.nodes_at_stage(i))
 
-probabilities = []
-for i in all_nodes:
-    innerlist = []
-    for j in i:
-        innerlist.append(tree.probability_of_node(j))
-    probabilities.append(innerlist)
-
-all_nodes_list = []
-for i in all_nodes:
-    all_nodes_list.append(i.tolist())
-
-combined = zip(all_nodes_list,probabilities)
-nodes_flat = [item for sublist in all_nodes_list for item in sublist]
-probabilities_flat = [item for sublist in probabilities for item in sublist]
 
 tree.bulls_eye_plot()
-#print(probabilities)
-#print(all_nodes)
 ancestry_list = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
-ancestry_list_test = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
 ancestry_list_probabilities = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
-ancestry_list_probabilities_test = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
-cost = 0
-# for i in all_nodes[-1]:
-#     print(f"Current node is {i}, its ancestor is {tree.ancestor_of(i)}")
-#     ancestry_list[i][tree.ancestor_of(i)] = 
-
-for count, node in enumerate(all_nodes[-1]):
-    #print(node)
-    
-    ancestry_list_probabilities[count][0] = tree.probability_of_node(node)
-    ancestry_list_probabilities[count][1] = tree.probability_of_node(tree.ancestor_of(node))
-    ancestry_list_probabilities[count][2] = tree.probability_of_node(tree.ancestor_of(tree.ancestor_of(node)))
-    ancestry_list_probabilities[count][3] = tree.probability_of_node(tree.ancestor_of(tree.ancestor_of(tree.ancestor_of(node))))
-
-for count, node in enumerate(all_nodes[-1]):
-    #print(node)
-    #print(f"count = {count}, node = {node}")
-    ancestry_list[count][0] = node
-    ancestry_list[count][1] = tree.ancestor_of(node)
-    ancestry_list[count][2] = tree.ancestor_of(tree.ancestor_of(node))
-    ancestry_list[count][3] = tree.ancestor_of(tree.ancestor_of(tree.ancestor_of(node)))
 
 for count, node in enumerate(all_nodes[-1]):
     for j in range(tree.num_stages):
-        #print(f"count = {count}, j = {j}, node = {node}")
-        ancestry_list_test[count][j] = node
+        ancestry_list[count][j] = node
         node = tree.ancestor_of(node)
 
 for count, node in enumerate(all_nodes[-1]):
     for j in range(tree.num_stages):
-        #print(f"count = {count}, j = {j}, node = {node}")
-        ancestry_list_probabilities_test[count][j] = tree.probability_of_node(node)
+        ancestry_list_probabilities[count][j] = tree.probability_of_node(node)
         node = tree.ancestor_of(node)
         
-
-
 print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in ancestry_list_probabilities]))
-print("--------------------------------------------")
-print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in ancestry_list_probabilities_test]))
-# for i in tree.nodes_at_stage(tree.num_stages-1)[::-1]:
-#     print(f"At node {i}, its ancestor is {tree.ancestor_of(i)} with probabilities of {tree.probability_of_node(i)}"\
-#             f" and {tree.probability_of_node(tree.ancestor_of(i))} respectively")
 
-# for i in all_nodes[::-1]:
-#     for j in i[::-1]:
-#         if j==0:
-#             break
-#         print(f"At node {j}, its ancestor is {tree.ancestor_of(j)} with probabilities of {tree.probability_of_node(j)}"\
-#             f" and {tree.probability_of_node(tree.ancestor_of(j))} respectively")
-
-
+cost = 0
+# for i in ancestry_list:
+#     for j in i:
+#         print(j)
 problem = og.builder.Problem(u, z0, cost)
 build_config = og.config.BuildConfiguration()\
     .with_build_directory("basic_optimizer")\
