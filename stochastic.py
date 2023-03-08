@@ -54,8 +54,8 @@ for i in all_nodes_list[1:(tree.num_stages-1)]:
      for j in i:
         cost += tree.probability_of_node(j)*(q*(x-xref)**2+(y-yref)**2+qpsi*(psi-psiref)**2+qbeta*(beta-betaref)**2)
         #print(f"At node {j} the probability is {tree.probability_of_node(j)}")
-        #print(i,j)
-        u_t = u[j:j+2]
+        print(i,j)
+        u_t = u[2*j:2*j+2]
         cost += 1 * cs.dot(u_t, u_t)
         beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
         psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])*ts
@@ -64,7 +64,9 @@ for i in all_nodes_list[1:(tree.num_stages-1)]:
         y += u_t[0]*cs.sin(psi_dot+beta_dot)*ts
         psi += ts*psi_dot
         beta += ts*beta_dot
-
+        print(u_t)
+        if 2*j>37:
+            break
 
 for i in all_nodes_list[tree.num_stages-1]:
         #print(f"At node {i} the probability is {tree.probability_of_node(i)}")
@@ -84,7 +86,7 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                             build_config,
                                             solver_config)
 
-builder.build()
+#builder.build()
 
 # Use TCP server
 # ------------------------------------
@@ -92,7 +94,7 @@ mng = og.tcp.OptimizerTcpManager('basic_optimizer/bicycle')
 mng.start()
 
 mng.ping()
-solution = mng.call([-0.8, -0.8, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
+solution = mng.call([1, 1, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
 mng.kill()
 
 
@@ -124,7 +126,10 @@ plt.show()
 # ------------------------------------
 x_init = [-1.0,-1.0,0.0,0.0]
 x_states = [0.0] * (nx*(N+2))
+print(x_states)
 x_states[0:nx+1] = x_init
+print("-------------")
+print(x_states)
 for t in range(0, N):
     u_t = u_star[t*nu:(t+1)*nu]
 
@@ -145,10 +150,13 @@ xx = x_states[0:nx*N:nx]
 xy = x_states[1:nx*N:nx]
 
 # print(x_states)
-print(xx)
+# print(xx)
 plt.plot(xx, xy, '-o')
 plt.show()
 
-print(f"Solution exit status "+str(solution["exit_status"]))
-print(f"Solution penalty "+str(solution["penalty"]))
-print(f"Solution time "+str(solution["solve_time_ms"]))
+# print(f"Solution exit status "+str(solution["exit_status"]))
+# print(f"Solution penalty "+str(solution["penalty"]))
+# print(f"Solution time "+str(solution["solve_time_ms"]))
+# print(f"Solution lagrange multipliers " + str(solution["lagrange_multipliers"]))
+# print(f"xx = {xx}")
+# print(f"xy = {xy}")

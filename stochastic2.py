@@ -7,8 +7,8 @@ import tree_gen
 (nu,nx,N,lf,lr,ts) = (2,4,20,1,1,0.1)       #nu = Number of inputs, nx = number of states
 ltot = lf+lr
 
-(xref, yref, psiref, betaref) = (1,1,0,0)
-(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 100, 2,2)
+(xref, yref, psiref, betaref) = (1,1,0,0)   #Target
+(q,qpsi,qbeta,r,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1, 200, 2,2)
 
 u = cs.SX.sym('u', nu*N)
 z0 = cs.SX.sym('z0', nx)
@@ -20,16 +20,16 @@ p = np.array([[0.3,0.15,0.2,0.2,0.15],      #Tranisitional probabilitiy of tree
               [0.25,0.2,0.3,0.25,0],
               [0.3,0,0.25,0.2,0.25],
               [0.2,0.25,0,0.3,0.25]])
-v_tree = np.array([0.4, 0.15, 0.15,0.15,0.15])       #initial probability of starting node
-(N_tree, tau) = (10, 3)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
+
+v_tree = np.array([0.6, 0.1, 0.1, 0.1,0.1])       #initial probability of starting node
+(N_tree, tau) = (20, 1)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
 tree = tree_gen.MarkovChainScenarioTreeFactory(p, v_tree, N_tree, tau).create()
 
 all_nodes = []
 for i in range(tree.num_stages):
     all_nodes.append(tree.nodes_at_stage(i))
 
-
-tree.bulls_eye_plot()
+#tree.bulls_eye_plot()
 ancestry_list = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
 ancestry_list_probabilities = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
 
@@ -42,13 +42,41 @@ for count, node in enumerate(all_nodes[-1]):
     for j in range(tree.num_stages):
         ancestry_list_probabilities[count][j] = tree.probability_of_node(node)
         node = tree.ancestor_of(node)
-        
-print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in ancestry_list_probabilities]))
+ 
+#print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in ancestry_list]))
 
 cost = 0
-# for i in ancestry_list:
-#     for j in i:
-#         print(j)
+
+for i in ancestry_list:
+    for j in i[1::]:
+        print(j,end=' ')
+    print()
+
+print("------------------")
+
+
+for i in range(len(ancestry_list)):
+    ancestry_list[i] = list(map(int,ancestry_list[i]))
+
+for count, node in enumerate(ancestry_list[0][1::]): 
+    print(f"node = {node}, probability = {tree.probability_of_node(node)}")
+    cost += tree.probability_of_node(node)*(q*(x-xref)**2+(y-yref)**2+qpsi*(psi-psiref)**2+qbeta*(beta-betaref)**2)
+    #print(f"At node {j} the probability is {tree.probability_of_node(j)}")
+    u_t = u[nu*count:nu*count+2]
+    beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
+    psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])
+    cost += r*cs.dot(u_t,u_t)
+
+    x += u_t[0]*cs.cos(psi_dot+beta_dot)*ts
+    y += u_t[0]*cs.sin(psi_dot+beta_dot)*ts
+    psi += ts*psi_dot
+    beta += ts*beta_dot  
+    if count==(N-1):
+        break
+
+
+cost += tree.probability_of_node(ancestry_list[0][-1])*(q*(x-xref)**2+(y-yref)**2+qpsi*(psi-psiref)**2+qbeta*(beta-betaref)**2)
+
 problem = og.builder.Problem(u, z0, cost)
 build_config = og.config.BuildConfiguration()\
     .with_build_directory("basic_optimizer")\
@@ -63,71 +91,76 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                             build_config,
                                             solver_config)
 
-#builder.build()
+builder.build()
 
 # Use TCP server
 # ------------------------------------
-# mng = og.tcp.OptimizerTcpManager('basic_optimizer/bicycle')
-# mng.start()
+mng = og.tcp.OptimizerTcpManager('basic_optimizer/bicycle')
+mng.start()
 
-# mng.ping()
-# solution = mng.call([-0.8, -0.8, 0.0, 0.0], initial_guess=[1.0] * (nu*N))
-# mng.kill()
+init_pos = [-1.0, 2.0, 0.0, 0.0]
+
+mng.ping()
+solution = mng.call(init_pos, initial_guess=[1.0] * (nu*N))
+mng.kill()
 
 
-# # Plot solution
-# # ------------------------------------
-# time = np.arange(0, ts*N, ts)
-# u_star = solution['solution']
-# ux = u_star[0:nu*N:2]
-# uy = u_star[1:nu*N:2]
-# upsi = u_star[2:nu*N:2]
-# ubeta = u_star[3:nu*N:2]
+# Plot solution
+# ------------------------------------
+time = np.arange(0, ts*N, ts)
+u_star = solution['solution']
+ux = u_star[0:nu*N:2]
+uy = u_star[1:nu*N:2]
+upsi = u_star[2:nu*N:2]
+ubeta = u_star[3:nu*N:2]
 
-# plt.subplot(4,1,1)
-# plt.plot(time, ux, '-o')
-# plt.ylabel('u_x')
-# plt.subplot(4,1,2)
-# plt.plot(time, uy, '-o')
-# plt.ylabel('u_y')
-# plt.subplot(4,1,3)
-# plt.plot(time[0:-1], upsi, '-o')
-# plt.ylabel('u_psi')
-# plt.subplot(4,1,4)
-# plt.plot(time[0:-1], ubeta, '-o')
-# plt.ylabel('u_beta')
-# plt.xlabel('Time')
-# plt.show()
+plt.subplot(4,1,1)
+plt.plot(time, ux, '-o')
+plt.ylabel('u_x')
+plt.subplot(4,1,2)
+plt.plot(time, uy, '-o')
+plt.ylabel('u_y')
+plt.subplot(4,1,3)
+plt.plot(time[0:-1], upsi, '-o')
+plt.ylabel('u_psi')
+plt.subplot(4,1,4)
+plt.plot(time[0:-1], ubeta, '-o')
+plt.ylabel('u_beta')
+plt.xlabel('Time')
+plt.show()
 
-# # Plot trajectory
-# # ------------------------------------
-# x_init = [-1.0,-1.0,0.0,0.0]
-# x_states = [0.0] * (nx*(N+2))
-# x_states[0:nx+1] = x_init
-# for t in range(0, N):
-#     u_t = u_star[t*nu:(t+1)*nu]
+# Plot trajectory
+# ------------------------------------
+x_init = init_pos
+x_states = [0.0] * (nx*(N+2))
+x_states[0:nx+1] = x_init
+for t in range(0, N):
+    u_t = u_star[t*nu:(t+1)*nu]
 
-#     x = x_states[t * nx]
-#     y = x_states[t * nx + 1]
-#     psi = x_states[t* nx + 2]
-#     beta = x_states[t * nx + 3]
+    x = x_states[t * nx]
+    y = x_states[t * nx + 1]
+    psi = x_states[t* nx + 2]
+    beta = x_states[t * nx + 3]
 
-#     beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
-#     psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])*ts
+    beta_dot = cs.atan((lr/ltot)*cs.tan(u_t[1]))
+    psi_dot = (u_t[0]/ltot)*cs.cos(beta_dot)*cs.tan(u_t[1])
 
-#     x_states[(t+1)*nx]  = x + ts*(u_t[0]*cs.cos(psi_dot+beta_dot))
-#     x_states[(t+1)*nx+1] = y + ts*(u_t[0]*cs.sin(psi_dot+beta_dot))
-#     x_states[(t+1)*nx+2] = psi + ts*psi_dot
-#     x_states[(t+1)*nx+3] = beta + ts*beta_dot
+    x_states[(t+1)*nx]  = x + ts*(u_t[0]*cs.cos(psi_dot+beta_dot))
+    x_states[(t+1)*nx+1] = y + ts*(u_t[0]*cs.sin(psi_dot+beta_dot))
+    x_states[(t+1)*nx+2] = psi + ts*psi_dot
+    x_states[(t+1)*nx+3] = beta + ts*beta_dot
 
-# xx = x_states[0:nx*N:nx]
-# xy = x_states[1:nx*N:nx]
+xx = x_states[0:nx*N:nx]
+xy = x_states[1:nx*N:nx]
 
-# # print(x_states)
-# print(xx)
-# plt.plot(xx, xy, '-o')
-# plt.show()
+# print(x_states)
 
-# print(f"Solution exit status "+str(solution["exit_status"]))
-# print(f"Solution penalty "+str(solution["penalty"]))
-# print(f"Solution time "+str(solution["solve_time_ms"]))
+print(f"x positions = {xx}")
+print(f"y positions = {xy}")
+
+plt.plot(xx, xy, '-o')
+plt.show()
+
+print(f"Solution exit status "+str(solution["exit_status"]))
+print(f"Solution penalty "+str(solution["penalty"]))
+print(f"Solution time "+str(solution["solve_time_ms"]))
