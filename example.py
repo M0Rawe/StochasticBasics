@@ -5,7 +5,7 @@ import numpy as np
 
 # Build parametric optimizer
 # ------------------------------------
-(nu, nx, N, L, ts) = (2, 3, 60, 0.5, 0.1)
+(nu, nx, N, L, ts) = (2, 3, 20, 0.5, 0.1)
 (xref, yref, thetaref) = (1, 1, 0)      #Target
 (q, qtheta, r, qN, qthetaN) = (10, 0.1, 1, 200, 2)
 
@@ -24,7 +24,6 @@ for t in range(0, nu*N, nu):
     x += ts * (u_t[0] + L * cs.sin(theta) * theta_dot)
     y += ts * (u_t[1] - L * cs.cos(theta) * theta_dot)
     theta += ts * theta_dot
-    print(u_t)
 
     c += cs.fmax(0,1 -x**2 - y**2)
 cost += qN*((x-xref)**2 + (y-yref)**2) + qthetaN*(theta-thetaref)**2
@@ -51,7 +50,7 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                           meta,
                                           build_config,
                                           solver_config)
-builder.build()
+#builder.build()
 
 # Use TCP server
 # ------------------------------------
@@ -59,7 +58,7 @@ mng = og.tcp.OptimizerTcpManager('my_optimizers/navigation')
 mng.start()
 
 mng.ping()
-start_pos = [-2.0, -2.0, 0.0]
+start_pos = [-1.0, 2.0, 0.0]
 solution = mng.call(start_pos, initial_guess=[1.0] * (nu*N))
 mng.kill()
 
@@ -67,7 +66,9 @@ mng.kill()
 # Plot solution
 # ------------------------------------
 time = np.arange(0, ts*N, ts)
+print(solution['solution'])
 u_star = solution['solution']
+
 ux = u_star[0:nu*N:2]
 uy = u_star[1:nu*N:2]
 
@@ -84,6 +85,7 @@ plt.show()
 # ------------------------------------
 x_init = start_pos
 x_states = [0.0] * (nx*(N+2))
+print(f"len(x_states)={len(x_states)}, x_states = {x_states} ")
 x_states[0:nx+1] = x_init
 for t in range(0, N):
     u_t = u_star[t*nu:(t+1)*nu]
@@ -91,16 +93,19 @@ for t in range(0, N):
     x = x_states[t * nx]
     y = x_states[t * nx + 1]
     theta = x_states[t * nx + 2]
-
+    print(f"x_states -> {x_states[t:t+nx]}")
     theta_dot = (1/L) * (u_t[1] * np.cos(theta) - u_t[0] * np.sin(theta))
 
     x_states[(t+1)*nx] = x + ts * (u_t[0] + L*np.sin(theta)*theta_dot)
     x_states[(t+1)*nx+1] = y + ts * (u_t[1] - L*np.cos(theta)*theta_dot)
     x_states[(t+1)*nx+2] = theta + ts*theta_dot
-print("Max = " +str(t * nx + 2))
-xx = x_states[0:nx*N:nx]
-xy = x_states[1:nx*N:nx]
 
+#    print(f"x = {x_states[t * nx]}, y = {x_states[t * nx+1]}, theta = {x_states[t * nx+2]}")
+xx = x_states[0:nx*N:nx] # ->[0:60:3]
+xy = x_states[1:nx*N:nx] # -> [1:60:3]
+print(xx)
+print('----------')
+print(xy)
 #print(x_states)
 #print(xx)
 plt.plot(xx, xy, '-o')
