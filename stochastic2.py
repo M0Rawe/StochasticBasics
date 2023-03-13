@@ -6,6 +6,8 @@ import tree_gen
 
 (nu,nx,N,lf,lr,ts) = (2,4,20,1,1,0.1)       #nu = Number of inputs, nx = number of states
 ltot = lf+lr
+(Rcar, Robj) = (1,1)
+Rmin = 0.5
 
 (xref, yref, psiref, vref) = (1,1,0,0)   #Target
 (q,qpsi,qbeta,r_v,r_beta,qN,qPsiN,qBetaN) = (10.0, 0.1, 0.1, 1,1, 200, 2,2)
@@ -24,7 +26,7 @@ all_nodes = []
 for i in range(tree.num_stages):
     all_nodes.append(tree.nodes_at_stage(i))
 
-#tree.bulls_eye_plot()
+tree.bulls_eye_plot()
 ancestry_list = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
 ancestry_list_probabilities = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
 
@@ -42,22 +44,6 @@ for count, node in enumerate(all_nodes[-1]):
 for i in range(len(ancestry_list)):
     ancestry_list[i] = list(map(int,ancestry_list[i]))
 
-cost = 0
-# for count, node in enumerate(ancestry_list[1::]): 
-#     #cost += tree.probability_of_node(node)*(q*(x-xref)**2+(y-yref)**2)+qpsi*(psi-psiref)**2+qbeta*(beta-betaref)**2
-#     u_t = u[nu*count:nu*count+2]
-#     print(u_t)
-#     beta = u_t[1]
-#     psi_dot = (u_t[0]/lr)*cs.sin(beta)
-#     cost += r*cs.dot(u_t,u_t)
-
-#     x += u_t[0]*cs.cos(psi_dot+beta)*ts
-#     y += u_t[0]*cs.sin(psi_dot+beta)*ts
-#     psi += ts*psi_dot
-#     beta += ts*beta_dot  
-#     if count==(N_tree-1):
-#         break
-
 u = cs.SX.sym('u', nu*tree.num_nonleaf_nodes)
 z0 = cs.SX.sym('z0', nx)
 (x,y,psi,v) = (z0[0], z0[1], z0[2], z0[3])
@@ -67,6 +53,8 @@ cost += r_v*u[0]**2+r_beta*u[1]**2
 z_sequence = [None]*tree.num_nonleaf_nodes
 z_sequence[0] = z0
 
+
+c=0
 for i in range(1,tree.num_nonleaf_nodes):
     idx_anc = tree.ancestor_of(i) 
 
@@ -89,16 +77,56 @@ for i in range(1,tree.num_nonleaf_nodes):
 
     z_sequence[i]=cs.vertcat(x_current,y_current,v_current,psi_current)
 
-
-# print(cost)
-#
+    c+= cs.fmax(0.0,Rmin**2-(1-x_current)**2-(1-y_current)**2)
 
 bounds = og.constraints.BallInf(radius = 1)
 
-problem = og.builder.Problem(u, z0, cost).with_constraints(bounds)
+obs_pos = [None,None]*tree.num_nodes        #[x_pos, y_pos]
+x_dist = [None]*tree.num_nodes
+y_dist = [None]*tree.num_nodes
+
+print(f" At stage 1 there are {tree.children_of(1)} nodes")
+print(f" At stage 2 there are {tree.children_of(2)} nodes")
+print(f" At stage 3 there are {tree.children_of(3)} nodes")
+print()
+
+
+for i in range(tree.num_nodes):
+    # obs_pos[i][0] =   1              #X pos
+    # obs_pos[i][1] =   1             #Y Pos
+    tree.set_data_at_node(i, {"pos": [1,1]})
+
+
+pos_ego = [None]*tree.num_nodes
+pos_obj = [None]*tree.num_nodes
+
+
+
+
+# print((f"Z sequence 1 -> {z_sequence[1]}"))
+# print()
+# print((f"Z sequence 1 0-> {z_sequence[1][0]}"))
+# print()
+# print((f"Z sequence 1 0-> {z_sequence[1][1]}"))
+# print("--------------------------------------")
+# print((f"Z sequence 2 -> {z_sequence[2]}"))
+# print()
+# print((f"Z sequence 2 0-> {z_sequence[2][0]}"))
+# print()
+# print((f"Z sequence 2 1-> {z_sequence[2][1]}"))
+# print(f"Len Z -> {len(z_sequence)}")
+# print(type(z_sequence[1]))
+# print(str(z_sequence[1][1])==str(z_sequence[10][1]))
+# print(tree.num_nodes)
+
+f2  =cs.vertcat(cs.fmax(0.0,Rmin**2-((1-z_sequence[:][0])**2-(1-z_sequence[:][1])**2)))
+
+problem = og.builder.Problem(u, z0,cost)\
+        .with_constraints(bounds)\
+        .with_penalty_constraints(c)    
 build_config = og.config.BuildConfiguration()\
     .with_build_directory("basic_optimizer")\
-    .with_build_mode("release")\
+    .with_build_mode("debug")\
     .with_tcp_interface_config()
 meta = og.config.OptimizerMeta()\
     .with_optimizer_name("bicycle")
@@ -148,11 +176,10 @@ x_init = init_pos
 x_states = [0.0] * (nx*(N+2))
 x_states[0:nx+1] = x_init
 
-print(u_star)
+#print(u_star)
 for t in range(0, N):
 
     u_t = u_star[t*nu:(t+1)*nu]
-    print(f"u values -> {u_t}")
     x = x_states[t * nx]
     y = x_states[t * nx + 1]
     psi = x_states[t* nx + 2]
@@ -165,8 +192,8 @@ for t in range(0, N):
     x_states[(t+1)*nx+1] = y + ts*(u_t[0]*cs.sin(psi_dot+beta_dot))
     x_states[(t+1)*nx+2] = psi + ts*psi_dot
     x_states[(t+1)*nx+3] = beta + ts*beta_dot
-    print(f"x_states -> {x_states[t:t+nx]}")
-    #print(f"x = {x_states[t * nx]}, y = {x_states[t * nx+1]}, psi = {x_states[t * nx+2]}, beta = {x_states[t * nx+3]}")
+    #print(f"x_states -> {x_states[t:t+nx]}")
+
 xx = x_states[0:nx*N:nx]
 xy = x_states[1:nx*N:nx]
 xpsi = x_states[3:nx*N:nx]
@@ -181,7 +208,5 @@ print(f"Solution exit status "+str(solution["exit_status"]))
 print(f"Solution penalty "+str(solution["penalty"]))
 print(f"Solution time "+str(solution["solve_time_ms"]))
 print(f"Iterations "+str(solution["num_inner_iterations"]))
+print(f"Cost "+str(solution["cost"]))
 
-# print(xx)
-# print("----------------------------------")
-# print(xy)
