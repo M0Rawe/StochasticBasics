@@ -22,27 +22,7 @@ v_tree = np.array([0.6, 0.1, 0.1, 0.1,0.1])       #initial probability of starti
 (N_tree, tau) = (N, 2)                   #N -> number of stages, tau -> stage at tree becomes stopped tree.
 tree = tree_gen.MarkovChainScenarioTreeFactory(p, v_tree, N_tree, tau).create()
 
-all_nodes = []
-for i in range(tree.num_stages):
-    all_nodes.append(tree.nodes_at_stage(i))
-
 tree.bulls_eye_plot()
-ancestry_list = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
-ancestry_list_probabilities = [[0 for x in range(tree.num_stages)] for y in range(len(all_nodes[-1]))]
-
-for count, node in enumerate(all_nodes[-1]):
-    for j in range(tree.num_stages):
-        ancestry_list[count][j] = node
-        node = tree.ancestor_of(node)
-
-for count, node in enumerate(all_nodes[-1]):
-    for j in range(tree.num_stages):
-        ancestry_list_probabilities[count][j] = tree.probability_of_node(node)
-        node = tree.ancestor_of(node)
- 
-#print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in ancestry_list]))
-for i in range(len(ancestry_list)):
-    ancestry_list[i] = list(map(int,ancestry_list[i]))
 
 u = cs.SX.sym('u', nu*tree.num_nonleaf_nodes)
 z0 = cs.SX.sym('z0', nx)
@@ -52,7 +32,6 @@ cost = tree.probability_of_node(0)*(q*(x-xref)**2+(y-yref)**2)+qpsi*(psi-psiref)
 cost += r_v*u[0]**2+r_beta*u[1]**2
 z_sequence = [None]*tree.num_nonleaf_nodes
 z_sequence[0] = z0
-
 
 c=0
 for i in range(1,tree.num_nonleaf_nodes):
@@ -81,43 +60,8 @@ for i in range(1,tree.num_nonleaf_nodes):
 
 bounds = og.constraints.BallInf(radius = 1)
 
-obs_pos = [None,None]*tree.num_nodes        #[x_pos, y_pos]
-x_dist = [None]*tree.num_nodes
-y_dist = [None]*tree.num_nodes
-
-print(f" At stage 1 there are {tree.children_of(1)} nodes")
-print(f" At stage 2 there are {tree.children_of(2)} nodes")
-print(f" At stage 3 there are {tree.children_of(3)} nodes")
-print()
-
-
 for i in range(tree.num_nodes):
-    # obs_pos[i][0] =   1              #X pos
-    # obs_pos[i][1] =   1             #Y Pos
     tree.set_data_at_node(i, {"pos": [1,1]})
-
-
-pos_ego = [None]*tree.num_nodes
-pos_obj = [None]*tree.num_nodes
-
-
-
-
-# print((f"Z sequence 1 -> {z_sequence[1]}"))
-# print()
-# print((f"Z sequence 1 0-> {z_sequence[1][0]}"))
-# print()
-# print((f"Z sequence 1 0-> {z_sequence[1][1]}"))
-# print("--------------------------------------")
-# print((f"Z sequence 2 -> {z_sequence[2]}"))
-# print()
-# print((f"Z sequence 2 0-> {z_sequence[2][0]}"))
-# print()
-# print((f"Z sequence 2 1-> {z_sequence[2][1]}"))
-# print(f"Len Z -> {len(z_sequence)}")
-# print(type(z_sequence[1]))
-# print(str(z_sequence[1][1])==str(z_sequence[10][1]))
-# print(tree.num_nodes)
 
 f2  =cs.vertcat(cs.fmax(0.0,Rmin**2-((1-z_sequence[:][0])**2-(1-z_sequence[:][1])**2)))
 
@@ -132,8 +76,7 @@ meta = og.config.OptimizerMeta()\
     .with_optimizer_name("bicycle")
 solver_config = og.config.SolverConfiguration()\
     .with_tolerance(1e-3)\
-    .with_initial_tolerance(1e-3)\
-    .with_preconditioning(True)
+    .with_initial_tolerance(1e-3)
 builder = og.builder.OpEnOptimizerBuilder(problem,
                                             meta,
                                             build_config,
