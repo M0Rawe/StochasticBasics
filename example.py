@@ -50,7 +50,7 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                           meta,
                                           build_config,
                                           solver_config)
-#builder.build()
+builder.build()
 
 # Use TCP server
 # ------------------------------------
